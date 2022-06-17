@@ -196,7 +196,7 @@ int makevfs(int c, char* v[]) {
 			//printf("%s\n", lowerstr);
 			writetmp->stack = 0x801FFFF0;
 			for (j = 0; j < sizeof(extstk) / sizeof(extstk[0]); j++) {
-				printf("%s, %s\n", lowerstr, extn[j]);
+				//printf("%s, %s\n", lowerstr, extn[j]);
 				if (!strcmp(lowerstr, extn[j])) {
 					writetmp->stack = extstk[j];
 				}
