@@ -1,19 +1,38 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 typedef unsigned long int u_long;
 const char magic[4] = { 'V', 'F', 'S', 0x00 };
 const int addr_size = 2048; //maybe use 4th byte of header to change this?
 const int buffer_max = 262144;
 const char padder[2048] = { 0 };
+const char extn[6][5] = {
+	".hit",
+	".pxm",
+	".psq",
+	".psp",
+	".txt",
+	".mnu",
+};
+
+const unsigned long int extstk[6] = {
+	0xFFFFFF01,
+	0xFFFFFF02,
+	0xFFFFFF03,
+	0xFFFFFF04,
+	0xFFFFFFFF,
+	0xFFFFFFFD,
+};
 
 typedef struct {
-	char	name[16];
+	char	name[64];
 	unsigned long int	size;
 	unsigned long int	addr;
-	//unsigned long int	sector_size;
-	//unsigned long int	byte_addr;
+	unsigned long int	sector_size;
+	unsigned long int	byte_addr;
+	unsigned long int	stack;
 } VFSFILE;
 
 
@@ -21,7 +40,13 @@ typedef struct {
 int splitvfs(int c, char* v[]);
 int makevfs(int c, char* v[]);
 int main(int argc, char* argv[]);
+int txttovfs(int c, char* v[]);
 
+
+int txttovfs(int c, char* v[]) {
+	printf("This feature is not implemented yet\n");
+	return 0;
+}
 
 int splitvfs(int c, char* v[]) {
 	int i;
@@ -92,8 +117,8 @@ int splitvfs(int c, char* v[]) {
 }
 
 int makevfs(int c, char* v[]) {
-	int oldsize, padbytes, fnlen, i, j, buffer_left, hdrpad;
-	char* buffer;
+	int oldsize, padbytes, fnlen, i, j, buffer_left, hdrpad, fnstart, fnend;
+	char *buffer, *fnext, *lowerstr;
 	FILE* outvfs;
 	long int filenum = c - 2;
 	VFSFILE* filelist = calloc(filenum, sizeof(VFSFILE));
@@ -121,25 +146,65 @@ int makevfs(int c, char* v[]) {
 		}
 		if (i == 2) {
 			writetmp->addr = lastaddr;
+			writetmp->byte_addr = writetmp->addr * addr_size;
 			oldsize = writetmp->size + padbytes;
+			writetmp->sector_size = oldsize / addr_size;
 		}
 		else {
-
 			writetmp->addr = (oldsize / addr_size) + lastaddr;
+			writetmp->byte_addr = writetmp->addr * addr_size;
 			oldsize = writetmp->size + padbytes;
+			writetmp->sector_size = oldsize / addr_size;
 		}
 
 		lastaddr = writetmp->addr;
 		fnlen = strlen(v[i]);
-		if (fnlen > 15) {
-			for (j = 0; j < 15; j++) {
-				writetmp->name[j] = v[i][j + (fnlen - 15)];
+		fnstart = 0;
+		fnend = fnlen;
+		for (j = 0; j < fnlen; j++) {
+			switch (v[i][j]) {
+			case '.':
+				fnend = j;
+				break;
+			case '/':
+			case '\\':
+				fnstart = j + 1;
+				break;
+			default:
+				break;
 			}
 		}
-		else {
-			for (j = 0; j < fnlen; j++) {
+		if (fnend - fnstart > 63) {
+			fnend = fnstart + 63;
+			/*
+			for (j = fnstart; j < fnstart + 63; j++) {
 				writetmp->name[j] = v[i][j];
 			}
+			*/
+		}
+		for (j = fnstart; j < fnend; j++) {
+			writetmp->name[j - fnstart] = v[i][j];
+		}
+		fnext = strrchr(v[i], '.');
+		
+		if (fnext) {
+			//printf("%i %s, ", strlen(fnext) + 2, fnext);
+			lowerstr = malloc(strlen(fnext) + 2);
+			for (j = 0; j <= strlen(fnext) + 1; j++) {
+				lowerstr[j] = tolower(fnext[j]);
+			}
+			//printf("%s\n", lowerstr);
+			writetmp->stack = 0x801FFFF0;
+			for (j = 0; j < sizeof(extstk) / sizeof(extstk[0]); j++) {
+				printf("%s, %s\n", lowerstr, extn[j]);
+				if (!strcmp(lowerstr, extn[j])) {
+					writetmp->stack = extstk[j];
+				}
+			}
+			free(lowerstr);
+		}
+		else {
+			writetmp->stack = 0x801FFFF0;
 		}
 		//printf("file found: %s size:%i addr:%i\n", writetmp->name, writetmp->size, writetmp->addr);
 		fclose(invfs);
@@ -156,6 +221,7 @@ int makevfs(int c, char* v[]) {
 	fwrite(filelist, filenum, sizeof(VFSFILE), outvfs);
 	fwrite(padder, 1, hdrpad, outvfs);
 	writetmp = filelist;
+	
 	buffer_left = 0;
 	for (i = 2; i < c; i++) {
 		FILE* invfs = fopen(v[i], "rb+");
@@ -190,6 +256,7 @@ int makevfs(int c, char* v[]) {
 		writetmp++;
 
 	}
+	free(filelist);
 	printf("Packing complete!\n");
 	return 0;
 }
@@ -198,11 +265,15 @@ int main(int argc, char* argv[]) {
 	if (argc < 3) {
 		printf("Usage: %s [options] outfile infile [infile2] [infile3]...\n", argv[0]);
 		printf("Option -x extracts all resources from the first file passed as an argument.\n");
+		printf("Option -l makes a VFS from the first LST file.\n");
 		printf("Otherwise, VFSTool will pack all other specified files into the first file.\n");
 		return 0;
 	}
 	else if (!strcmp(argv[1], "-x")) {
 		return splitvfs(argc, argv);
+	}
+	else if (!strcmp(argv[1], "-l")) {
+		return txttovfs(argc, argv);
 	}
 	else {
 		return makevfs(argc, argv);

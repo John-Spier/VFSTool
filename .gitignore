@@ -361,3 +361,8 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/Vfs_Tool/testnoext
+/Vfs_Tool/test3.vfs
+/Vfs_Tool/test2.vfs
+/Vfs_Tool/manytwos.psq
+/Vfs_Tool/fewones.hit
