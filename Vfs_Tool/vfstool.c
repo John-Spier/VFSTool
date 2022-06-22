@@ -17,7 +17,7 @@ const char extn[6][5] = {
 	".mnu",
 };
 
-const unsigned long int extstk[6] = {
+const u_long extstk[6] = {
 	0xFFFFFF01,
 	0xFFFFFF02,
 	0xFFFFFF03,
@@ -28,11 +28,11 @@ const unsigned long int extstk[6] = {
 
 typedef struct {
 	char	name[64];
-	unsigned long int	size;
-	unsigned long int	addr;
-	unsigned long int	sector_size;
-	unsigned long int	byte_addr;
-	unsigned long int	stack;
+	u_long	size;
+	u_long	addr;
+	u_long	sector_size;
+	u_long	byte_addr;
+	u_long	stack;
 } VFSFILE;
 
 
@@ -44,7 +44,90 @@ int txttovfs(int c, char* v[]);
 
 
 int txttovfs(int c, char* v[]) {
-	printf("This feature is not implemented yet\n");
+
+	typedef struct {
+		char fn[256];
+		long fs;
+		long pad;
+		long sectors;
+		int source;
+	} FILENAME;
+
+	char name[64];
+	char filename[256];
+	FILENAME* fnlist;
+	u_long stack = 0;
+	int trackof = 0;
+	int filenum = 0;
+	int f = 0;
+	long cur_sector = 0;
+	long start_pad = 0;
+	//long cur_byte = 0;
+	VFSFILE* allfiles;
+	FILE* infile, outfile;
+	FILE* intxt = fopen(v[2], "rb+");
+	
+
+
+	if (!intxt) {
+		perror("Can't open CSV");
+		return 1;
+	}
+
+	while (fscanf(intxt, "%X,%i,\"%63[^\"]\",\"%255[^\"]\"", &stack, &trackof, name, filename) != EOF) {
+		filenum++;
+	}
+	fseek(intxt, 0, SEEK_SET);
+
+	allfiles = calloc(sizeof(VFSFILE), filenum);
+	fnlist = calloc(sizeof(FILENAME), filenum);
+
+	start_pad = addr_size - ((sizeof(VFSFILE) * filenum) % addr_size);
+	if (start_pad == addr_size) {
+		start_pad = 0;
+	}
+	cur_sector = (start_pad + (sizeof(VFSFILE) * filenum)) / addr_size;
+
+	while (fscanf(intxt, "%X,%i,\"%63[^\"]\",\"%255[^\"]\"", &stack, &trackof, name, filename) != EOF) {
+		
+		infile = fopen(filename, "wb+");
+		//realloc(allfiles, sizeof(VFSFILE) * (filenum + 1));
+		//realloc(fnlist, sizeof(FILENAME) * (filenum + 1));
+		allfiles[f].stack = stack;
+		fseek(infile, 0, SEEK_END);
+		if (trackof == -1) {
+			fnlist[f].fs = ftell(infile);
+			fnlist[f].pad = addr_size - (fnlist[f].fs % addr_size);
+			if (fnlist[f].pad == addr_size) {
+				fnlist[f].pad = 0;
+			}
+			fnlist[f].sectors = (fnlist[f].pad + fnlist[f].fs) / addr_size;
+		} else {
+			fnlist[f].fs = 0;
+			fnlist[f].pad = 0;
+			fnlist[f].sectors = 0;
+		}
+		strcpy(fnlist[f].fn, filename);
+		strcpy(allfiles[f].name, name);
+		fnlist[f].source = trackof;
+		fclose(infile);
+		allfiles[f].size = fnlist[f].fs;
+		allfiles[f].sector_size = fnlist[f].sectors;
+		allfiles[f].addr = cur_sector;
+		allfiles[f].byte_addr = cur_sector * addr_size;
+		cur_sector += fnlist[f].sectors;
+		//printf("%i %i %i %s %i\n", allfiles[f].sector_size, allfiles[f].addr, allfiles[f].size, allfiles[f].name, allfiles[f].stack);
+		f++;
+	}
+	
+	for (f = 0; f < filenum; f++) {
+		if (fnlist[f].source != -1) {
+			allfiles[f].addr = allfiles[fnlist[f].source].addr;
+			allfiles[f].byte_addr = allfiles[fnlist[f].source].byte_addr;
+			allfiles[f].size = allfiles[fnlist[f].source].size;
+			allfiles[f].sector_size = allfiles[fnlist[f].source].sector_size;
+		}
+	}
 	return 0;
 }
 
@@ -265,14 +348,14 @@ int main(int argc, char* argv[]) {
 	if (argc < 3) {
 		printf("Usage: %s [options] outfile infile [infile2] [infile3]...\n", argv[0]);
 		printf("Option -x extracts all resources from the first file passed as an argument.\n");
-		printf("Option -l makes a VFS from the first LST file.\n");
+		printf("Option -c makes a VFS from the first CSV file argument.\n");
 		printf("Otherwise, VFSTool will pack all other specified files into the first file.\n");
 		return 0;
 	}
 	else if (!strcmp(argv[1], "-x")) {
 		return splitvfs(argc, argv);
 	}
-	else if (!strcmp(argv[1], "-l")) {
+	else if (!strcmp(argv[1], "-c")) {
 		return txttovfs(argc, argv);
 	}
 	else {

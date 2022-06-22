@@ -366,3 +366,7 @@ FodyWeavers.xsd
 /Vfs_Tool/test2.vfs
 /Vfs_Tool/manytwos.psq
 /Vfs_Tool/fewones.hit
+/Vfs_Tool/external name
+/Vfs_Tool/external 2 name
+/Vfs_Tool/-l
+/Vfs_Tool/txt1.txt
