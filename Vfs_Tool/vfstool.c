@@ -185,6 +185,7 @@ int txttovfs(int c, char* v[]) {
 
 int splitvfs(int c, char* v[]) {
 	int i, j;
+	int manual = 3;
 	char header[4];
 	char fn_sp[70];
 	long int filenum = 0;
@@ -229,7 +230,13 @@ int splitvfs(int c, char* v[]) {
 				sprintf(fn_sp,"%s%s",readtmp->name,extn[j]);
 			}
 		}
-		outvfs = fopen(fn_sp, "wb+");
+		if (manual < c) {
+			outvfs = fopen(v[manual], "wb+");
+			manual++;
+		}
+		else {
+			outvfs = fopen(fn_sp, "wb+");
+		}
 		if (!outvfs) {
 			perror("Can't open output file");
 			return 1;
@@ -407,7 +414,7 @@ int main(int argc, char* argv[]) {
 	if (argc < 3) {
 		printf("Usage: %s [options] outfile infile [infile2] [infile3]...\n", argv[0]);
 		printf("Option -x extracts all resources from the first file passed as an argument.\n");
-		printf("Option -c makes a VFS (file arg 3) from the first CSV file argument.\n");
+		printf("Option -c makes a VFS (file arg 2) from the first CSV file argument.\n");
 		printf("Otherwise, VFSTool will pack all other specified files into the first file.\n");
 		return 0;
 	}
