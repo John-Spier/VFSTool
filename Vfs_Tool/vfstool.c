@@ -66,7 +66,7 @@ int txttovfs(int c, char* v[]) {
 	long start_pad = 0;
 	long start_byte = 0;
 	long start_sect = 0;
-	//long cur_byte = 0;
+	long cur_byte = 0;
 	int buffer_left = 0;
 	char* buffer;
 	VFSFILE* allfiles;
@@ -87,14 +87,15 @@ int txttovfs(int c, char* v[]) {
 
 	allfiles = calloc(sizeof(VFSFILE), filenum);
 	fnlist = calloc(sizeof(FILENAME), filenum);
-	start_byte = (((sizeof(VFSFILE) * filenum) + 12) % addr_size);
+	cur_byte = (sizeof(VFSFILE) * filenum) + 12;
+	start_byte = cur_byte % addr_size;
 	start_pad = addr_size - start_byte;
 	if (start_pad == addr_size) {
 		start_pad = 0;
 	}
-	start_sect = (start_pad + start_byte) / addr_size;
+	start_sect = (start_pad + cur_byte) / addr_size;
 	cur_sector = start_sect;
-
+	//printf("STARTING SECTOR: %i Starting Byte: %i starting\n", start_sect, cur_byte);
 	while (fscanf(intxt, "%X,%i,\"%63[^\"]\",\"%255[^\"]\"", &stack, &trackof, name, filename) != EOF) {
 		
 		infile = fopen(filename, "rb+");
